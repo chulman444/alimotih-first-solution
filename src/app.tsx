@@ -22,9 +22,19 @@ class App extends React.Component<any, any> {
     if(tab_id) {
       this.tab_id = tab_id
       const { [tab_id]: entry } = await browser.storage.local.get(String(tab_id))
-      const state = Object.assign(entry, { progress: 50 })
-      this.setState(state)
-      this.forceUpdate()
+      const state = Object.assign(entry)
+      await new Promise((res, rej) => {
+        this.setState(state, () => {
+          this.forceUpdate(() => res())
+        })
+      })
+      
+      if(this.state.state == "start") {
+        this.startCountAnimation(this.state.start_dt)
+      }
+      else {
+        this.setState({ progress: 100 })
+      }
     }
   }
   
@@ -86,15 +96,18 @@ class App extends React.Component<any, any> {
       const { state: new_state } = await updateEntry(this.tab_id, { state: "start" })
       this.setState({ state: new_state })
       
-      browser.tabs.sendMessage(
+      const { start_dt } = await browser.tabs.sendMessage(
         this.tab_id,
-        { action: "autoClickStart", interval: this.state.interval }
+        {
+          action: "autoClickStart",
+          interval: this.state.interval,
+          tab_id: this.tab_id
+        }
       )
+      
+      // Make sure we don't have multiple progress bar animation tasks
       clearInterval(this.progress_animation_id)
-      this.progress_animation_id = setInterval(() => {
-        const progress = this.state.progress + 10
-        this.setState({ progress })
-      }, 800) as any as number
+      this.startCountAnimation(start_dt)
     }
     else if(this.state.state == "start") {
       const { state: new_state } = await updateEntry(this.tab_id, { state: "stop" })
@@ -103,6 +116,23 @@ class App extends React.Component<any, any> {
       browser.tabs.sendMessage(this.tab_id, { action: "autoClickStop" })
       clearInterval(this.progress_animation_id)
     }
+  }
+  
+  startCountAnimation(start_dt:number) {
+    this.progress_animation_id = setInterval(() => {
+      this.getProgressValue(start_dt)
+      const progress = this.getProgressValue(start_dt)
+      this.setState({ progress })
+    }, 100) as any as number
+  }
+  
+  getProgressValue(start_dt:number) {
+    const cur_date = new Date()
+    const passed_ms = Number(cur_date) - start_dt
+    const passed_s = passed_ms / 1000
+    const full_circle_value = Number(this.state.interval)
+    const progress = (passed_s / full_circle_value) * 100
+    return progress
   }
   
   async shakeImg() {

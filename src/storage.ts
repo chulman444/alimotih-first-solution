@@ -9,6 +9,12 @@ export async function initEntryIfPossible(tab_id:number) {
       [tab_id]: {
         state: 'stop',
         interval: 5,
+        
+        // Modified by background script
+        url: null,
+        
+        // Modified by the content script
+        start_dt: null
       }
     })
   }

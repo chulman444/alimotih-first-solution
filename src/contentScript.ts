@@ -1,6 +1,6 @@
 import { browser } from 'webextension-polyfill-ts'
 
-import { initEntryIfPossible } from './storage'
+import { initEntryIfPossible, updateEntry } from './storage'
 
 let task_id:null|number = null
 
@@ -10,9 +10,8 @@ async function main() {
     await initEntryIfPossible(tab_id)
   }
 }
-main()
 
-browser.runtime.onMessage.addListener((message:any, sender:any) => {
+browser.runtime.onMessage.addListener(async (message:any, sender:any) => {
   const action = message.action
   if(action == "shakeImg") {
     const biggest_img_element = getBiggestVisibleImgElement()
@@ -27,17 +26,28 @@ browser.runtime.onMessage.addListener((message:any, sender:any) => {
   }
   else if(action == "autoClickStart") {
     const interval = message.interval
+    const tab_id = message.tab_id
+    const start_dt = new Date()
+    
     clearInterval(task_id!)
+    
     task_id = setInterval(() => {
       const biggest_img_element = getBiggestVisibleImgElement()
       biggest_img_element.click()
       console.log(`Auto click!`)
     }, interval * 1000) as any as number
+    
+    const updated = await updateEntry(tab_id, { start_dt: Number(start_dt) })
+    
+    return { start_dt: updated.start_dt }
   }
   else if(action == "autoClickStop") {
     console.log("Received a message")
     clearInterval(task_id!)
     task_id = null
+  }
+  else if(action == "getUrl") {
+    return location.href
   }
 })
 
